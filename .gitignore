@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+*.so
+.env
+.venv/
+venv/
+*.log
+*.db
+storage/
+storage/certidoes/
+*.pdf
