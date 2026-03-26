@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Request, Response
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 from sqlalchemy import func
 from typing import List, Optional, Any
 from uuid import UUID
@@ -34,7 +34,7 @@ def listar_certidoes(
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
-    query = db.query(Certidao)
+    query = db.query(Certidao).options(defer(Certidao.arquivo_conteudo))
     
     if current_user.role == "admin":
         if current_user.hub_ids:
@@ -214,4 +214,3 @@ def upsert_certidao(
     db.refresh(upserted_certidao)
     
     return upserted_certidao
-
