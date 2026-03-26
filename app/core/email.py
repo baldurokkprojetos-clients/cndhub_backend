@@ -9,6 +9,11 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+def _build_frontend_url(path: str, token: str) -> str:
+    base_url = (settings.FRONTEND_URL or "http://localhost:3000").rstrip("/")
+    normalized_path = path.lstrip("/")
+    return f"{base_url}/{normalized_path}?token={token}"
+
 def get_resend_api_key():
     db = SessionLocal()
     try:
@@ -122,7 +127,7 @@ def _send_real_email_sync(email_to: str, subject: str, body: str):
     )
 
 def send_verification_email(email_to: str, token: str):
-    verification_url = f"http://localhost:3000/verify-email?token={token}"
+    verification_url = _build_frontend_url("verify-email", token)
     
     subject = "Verifique seu cadastro no sistema"
     body = f"""
@@ -145,7 +150,7 @@ def send_verification_email(email_to: str, token: str):
     return True
 
 async def send_verification_email_async(email_to: str, token: str):
-    verification_url = f"http://localhost:3000/verify-email?token={token}"
+    verification_url = _build_frontend_url("verify-email", token)
 
     subject = "Verifique seu cadastro no sistema"
     body = f"""
@@ -171,7 +176,7 @@ async def send_verification_email_async(email_to: str, token: str):
     return True
 
 async def send_password_reset_email_async(email_to: str, token: str):
-    reset_url = f"http://localhost:3000/reset-password?token={token}"
+    reset_url = _build_frontend_url("reset-password", token)
     
     subject = "Recuperação de Senha - Politeto CND"
     body = f"""

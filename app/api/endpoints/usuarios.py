@@ -1,18 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.base import Usuario, Hub, Cliente
 from app.schemas.schemas import UsuarioCreate, UsuarioUpdate, UsuarioResponse
 from app.api.deps import get_current_user, CurrentUser
 from app.core.security import create_verification_token, get_password_hash
-from app.core.email import send_verification_email
+from app.core.email import send_verification_email_async
 from typing import List
 import uuid
+import asyncio
 
 router = APIRouter()
 
 @router.post("/", response_model=UsuarioResponse)
-def create_usuario(usuario: UsuarioCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
+def create_usuario(usuario: UsuarioCreate, db: Session = Depends(get_db), current_user: CurrentUser = Depends(get_current_user)):
     db_usuario = db.query(Usuario).filter(Usuario.email == usuario.email).first()
     if db_usuario:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -91,7 +92,7 @@ def create_usuario(usuario: UsuarioCreate, background_tasks: BackgroundTasks, db
     
     # Gerar token e enviar email de validação
     token = create_verification_token(db_user.email)
-    background_tasks.add_task(send_verification_email, db_user.email, token)
+    asyncio.create_task(send_verification_email_async(db_user.email, token))
     
     return db_user
 

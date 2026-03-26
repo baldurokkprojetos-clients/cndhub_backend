@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -7,9 +7,10 @@ from app.models.base import Cliente, Usuario, Hub, Certidao, Job, TipoCertidao
 from app.schemas.schemas import ClienteCreate, ClienteUpdate, ClienteResponse
 from app.api.deps import get_current_user, CurrentUser
 from app.core.security import create_verification_token, get_password_hash
-from app.core.email import send_verification_email
+from app.core.email import send_verification_email_async
 import uuid
 import logging
+import asyncio
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -50,7 +51,6 @@ def listar_clientes(
 @router.post("/", response_model=ClienteResponse)
 def criar_cliente(
     cliente: ClienteCreate, 
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: CurrentUser = Depends(get_current_user)
 ):
@@ -130,7 +130,7 @@ def criar_cliente(
             
             # Gerar token e enviar email de validação
             token = create_verification_token(db_user.email)
-            background_tasks.add_task(send_verification_email, db_user.email, token)
+            asyncio.create_task(send_verification_email_async(db_user.email, token))
 
     db.commit()
     db.refresh(db_cliente)

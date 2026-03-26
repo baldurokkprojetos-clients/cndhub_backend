@@ -15,6 +15,8 @@ class Settings(BaseSettings):
     
     # Worker Settings
     API_BASE_URL: str = "http://localhost:8000"
+
+    FRONTEND_URL: str = "http://localhost:3000"
     
     # Supabase Settings (for file upload)
     SUPABASE_URL: Optional[str] = None
