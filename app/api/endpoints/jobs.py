@@ -87,17 +87,21 @@ def listar_jobs(
     if current_user.role != "master":
         raise HTTPException(status_code=403, detail="Acesso restrito a Master")
         
-    jobs = db.query(Job).order_by(Job.created_at.desc()).all()
+    jobs = (
+        db.query(
+            Job,
+            Cliente.razao_social.label("cliente_nome"),
+            Certidao.status.label("certidao_status"),
+            TipoCertidao.nome.label("tipo_cert_nome")
+        )
+        .join(Cliente, Cliente.id == Job.cliente_id)
+        .outerjoin(Certidao, Certidao.id == Job.certidao_id)
+        .outerjoin(TipoCertidao, TipoCertidao.id == Certidao.tipo_certidao_id)
+        .order_by(Job.created_at.desc())
+        .all()
+    )
     result = []
-    for job in jobs:
-        cliente = db.query(Cliente).filter(Cliente.id == job.cliente_id).first()
-        certidao = db.query(Certidao).filter(Certidao.id == job.certidao_id).first()
-        tipo_cert_nome = ""
-        if certidao:
-            tipo_cert = db.query(TipoCertidao).filter(TipoCertidao.id == certidao.tipo_certidao_id).first()
-            if tipo_cert:
-                tipo_cert_nome = tipo_cert.nome
-                
+    for job, cliente_nome, certidao_status, tipo_cert_nome in jobs:
         result.append({
             "id": job.id,
             "tipo": job.tipo,
@@ -105,9 +109,9 @@ def listar_jobs(
             "tentativas": job.tentativas,
             "locked_by": job.locked_by,
             "criado_em": job.created_at,
-            "cliente_nome": cliente.razao_social if cliente else "Desconhecido",
-            "certidao_tipo": tipo_cert_nome,
-            "certidao_status": certidao.status if certidao else "Desconhecido"
+            "cliente_nome": cliente_nome or "Desconhecido",
+            "certidao_tipo": tipo_cert_nome or "",
+            "certidao_status": certidao_status or "Desconhecido"
         })
     return result
 
@@ -118,7 +122,16 @@ def get_pending_jobs(limit: int = 10, db: Session = Depends(get_db), hub: Any = 
     ten_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=10)
     
     from sqlalchemy import or_
-    jobs = db.query(Job).join(Cliente).filter(
+    jobs = db.query(
+        Job,
+        Cliente,
+        Certidao,
+        TipoCertidao
+    ).join(Cliente, Cliente.id == Job.cliente_id).outerjoin(
+        Certidao, Certidao.id == Job.certidao_id
+    ).outerjoin(
+        TipoCertidao, TipoCertidao.id == Certidao.tipo_certidao_id
+    ).filter(
         Cliente.hub_id == hub.id,
         Job.tipo == 'emitir_certidao',
         or_(
@@ -134,23 +147,13 @@ def get_pending_jobs(limit: int = 10, db: Session = Depends(get_db), hub: Any = 
     # O Worker que está chamando a API pode enviar seu ID, mas usaremos um genérico
     worker_id = "worker_remote" 
     
-    for job in jobs:
+    for job, cliente, certidao, tipo_cert in jobs:
         try:
             job.status = 'processing'
             job.locked_by = worker_id
             job.locked_at = datetime.now(timezone.utc)
             db.commit()
-            
-            # Buscar informações do cliente
-            cliente = db.query(Cliente).filter(Cliente.id == job.cliente_id).first()
-            
-            # Buscar informações do tipo de certidão
-            tipo_cert = db.query(TipoCertidao).filter(TipoCertidao.id == job.certidao_id).first()
-            if not tipo_cert:
-                certidao = db.query(Certidao).filter(Certidao.id == job.certidao_id).first()
-                if certidao:
-                    tipo_cert = db.query(TipoCertidao).filter(TipoCertidao.id == certidao.tipo_certidao_id).first()
-            
+
             if not cliente or not tipo_cert:
                 job.status = 'error'
                 db.commit()

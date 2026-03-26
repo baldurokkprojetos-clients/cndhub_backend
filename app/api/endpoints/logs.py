@@ -20,7 +20,17 @@ def listar_logs_jobs(
     if current_user.role != "master":
         raise HTTPException(status_code=403, detail="Acesso negado. Apenas usuários Master podem visualizar os logs.")
 
-    query = db.query(Job).order_by(Job.created_at.desc())
+    query = (
+        db.query(
+            Job,
+            Cliente.razao_social.label("cliente_nome"),
+            TipoCertidao.nome.label("tipo_cert_nome")
+        )
+        .join(Cliente, Cliente.id == Job.cliente_id)
+        .outerjoin(Certidao, Certidao.id == Job.certidao_id)
+        .outerjoin(TipoCertidao, TipoCertidao.id == Certidao.tipo_certidao_id)
+        .order_by(Job.created_at.desc())
+    )
     
     if status:
         query = query.filter(Job.status == status)
@@ -28,15 +38,7 @@ def listar_logs_jobs(
     jobs = query.limit(limit).all()
     
     result = []
-    for job in jobs:
-        cliente = db.query(Cliente).filter(Cliente.id == job.cliente_id).first()
-        certidao = db.query(Certidao).filter(Certidao.id == job.certidao_id).first()
-        tipo_cert_nome = ""
-        if certidao:
-            tipo_cert = db.query(TipoCertidao).filter(TipoCertidao.id == certidao.tipo_certidao_id).first()
-            if tipo_cert:
-                tipo_cert_nome = tipo_cert.nome
-
+    for job, cliente_nome, tipo_cert_nome in jobs:
         result.append({
             "id": job.id,
             "tipo": job.tipo,
@@ -46,8 +48,8 @@ def listar_logs_jobs(
             "locked_at": job.locked_at,
             "created_at": job.created_at,
             "cliente_id": job.cliente_id,
-            "cliente_nome": cliente.razao_social if cliente else "Desconhecido",
-            "certidao_tipo": tipo_cert_nome,
+            "cliente_nome": cliente_nome or "Desconhecido",
+            "certidao_tipo": tipo_cert_nome or "",
             "certidao_id": job.certidao_id
         })
         

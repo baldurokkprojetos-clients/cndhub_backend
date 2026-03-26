@@ -33,11 +33,17 @@ def listar_clientes(
             return []
         
     clientes = query.all()
+    cliente_ids = [cliente.id for cliente in clientes]
+    tipos_por_cliente = {}
+    if cliente_ids:
+        certidoes = db.query(Certidao.cliente_id, Certidao.tipo_certidao_id).filter(
+            Certidao.cliente_id.in_(cliente_ids)
+        ).all()
+        for cliente_id, tipo_id in certidoes:
+            tipos_por_cliente.setdefault(cliente_id, []).append(str(tipo_id))
     
-    # Preencher tipos_certidoes a partir da tabela Certidao
     for cliente in clientes:
-        certidoes = db.query(Certidao.tipo_certidao_id).filter(Certidao.cliente_id == cliente.id).all()
-        setattr(cliente, "tipos_certidoes", [str(c[0]) for c in certidoes])
+        setattr(cliente, "tipos_certidoes", tipos_por_cliente.get(cliente.id, []))
         
     return clientes
 
