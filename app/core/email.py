@@ -140,14 +140,10 @@ def send_verification_email(email_to: str, token: str):
     </html>
     """
     
-    # Try sending real email
     if _send_real_email_sync(email_to, subject, body):
         return True
-        
-    # Fallback to simulation
-    logger.info(f"Email simulation sent to {email_to} with subject {subject}")
-    
-    return True
+    logger.warning(f"Email sending failed for {email_to}")
+    return False
 
 async def send_verification_email_async(email_to: str, token: str):
     verification_url = _build_frontend_url("verify-email", token)
@@ -170,10 +166,8 @@ async def send_verification_email_async(email_to: str, token: str):
         logger.info("Email sent successfully")
         return True
 
-    logger.info("Email sending failed, falling back to simulation")
-    logger.info(f"Email simulation sent to {email_to} with subject {subject}")
-
-    return True
+    logger.warning(f"Email sending failed for {email_to}")
+    return False
 
 async def send_password_reset_email_async(email_to: str, token: str):
     reset_url = _build_frontend_url("reset-password", token)
@@ -200,10 +194,8 @@ async def send_password_reset_email_async(email_to: str, token: str):
         logger.info("Email sent successfully")
         return True
         
-    logger.info("Email sending failed, falling back to simulation")
-    logger.info(f"Email simulation sent to {email_to} with subject {subject}")
-    
-    return True
+    logger.warning(f"Email sending failed for {email_to}")
+    return False
 
 def send_password_reset_email(email_to: str, token: str):
     # This is the old synchronous wrapper if needed, but we will use the async one in the router

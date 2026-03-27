@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Dict, Any
 from app.core.database import get_db
-from app.models.base import Cliente, Certidao, Job, Hub
+from app.models.base import Cliente, Certidao, Job, Hub, TipoCertidao
 from app.api.deps import get_current_user, CurrentUser
 
 router = APIRouter()
@@ -36,29 +36,34 @@ def get_dashboard_stats(
         processamento_hoje = q_jobs.filter(Job.status.in_(["pending", "processing", "completed", "error"])).count()
         com_erro = q_jobs.filter(Job.status == "error").count()
         
-        # Atividades recentes baseadas nos jobs mais novos
-        recent_jobs = q_jobs.order_by(Job.created_at.desc()).limit(5).all()
-        from app.models.base import TipoCertidao
-        atividades_recentes = []
-        for j in recent_jobs:
-            cliente = db.query(Cliente).filter(Cliente.id == j.cliente_id).first()
-            cliente_nome = cliente.razao_social if cliente else "Sistema"
-            
-            tipo_nome = j.tipo
-            if j.certidao_id:
-                cert = db.query(Certidao).filter(Certidao.id == j.certidao_id).first()
-                if cert:
-                    tipo_cert = db.query(TipoCertidao).filter(TipoCertidao.id == cert.tipo_certidao_id).first()
-                    if tipo_cert:
-                        tipo_nome = tipo_cert.nome
-                        
-            atividades_recentes.append({
-                "id": str(j.id),
-                "status": j.status,
-                "tipo": tipo_nome,
-                "cliente": cliente_nome,
-                "time": j.created_at.strftime("%H:%M") if j.created_at else "00:00"
-            })
+        recent_jobs_query = (
+            db.query(
+                Job.id,
+                Job.status,
+                Job.tipo,
+                Job.created_at,
+                Cliente.razao_social.label("cliente_nome"),
+                TipoCertidao.nome.label("tipo_cert_nome")
+            )
+            .outerjoin(Cliente, Cliente.id == Job.cliente_id)
+            .outerjoin(Certidao, Certidao.id == Job.certidao_id)
+            .outerjoin(TipoCertidao, TipoCertidao.id == Certidao.tipo_certidao_id)
+        )
+        if current_user.role == "admin" and current_user.hub_ids:
+            recent_jobs_query = recent_jobs_query.filter(Cliente.hub_id.in_(current_user.hub_ids))
+        elif current_user.role == "cliente" and current_user.cliente_ids:
+            recent_jobs_query = recent_jobs_query.filter(Job.cliente_id.in_(current_user.cliente_ids))
+        recent_jobs = recent_jobs_query.order_by(Job.created_at.desc()).limit(5).all()
+        atividades_recentes = [
+            {
+                "id": str(job_id),
+                "status": status,
+                "tipo": tipo_cert_nome or tipo,
+                "cliente": cliente_nome or "Sistema",
+                "time": created_at.strftime("%H:%M") if created_at else "00:00"
+            }
+            for job_id, status, tipo, created_at, cliente_nome, tipo_cert_nome in recent_jobs
+        ]
         
         total_jobs = q_jobs.count()
         completed_jobs = q_jobs.filter(Job.status == "completed").count()

@@ -160,6 +160,8 @@ def atualizar_cliente(
     
     logger.info(f"Atualizando cliente {cliente_id}")
     update_data = cliente.model_dump(exclude_unset=True, exclude={"tipos_certidoes"})
+    if current_user.role == "admin" and update_data.get("hub_id") and update_data["hub_id"] not in current_user.hub_ids:
+        raise HTTPException(status_code=403, detail="Acesso negado para alterar HUB deste cliente.")
     for key, value in update_data.items():
         setattr(db_cliente, key, value)
         

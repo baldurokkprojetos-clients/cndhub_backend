@@ -194,5 +194,7 @@ async def resend_verification(data: ResendVerificationRequest, db: Session = Dep
         return {"msg": "E-mail já verificado anteriormente."}
 
     token = create_verification_token(user.email)
-    asyncio.create_task(send_verification_email_async(user.email, token))
+    success = await send_verification_email_async(user.email, token)
+    if not success:
+        raise HTTPException(status_code=500, detail="Falha ao enviar o e-mail de verificação.")
     return {"msg": "Se o e-mail estiver cadastrado, você receberá um novo link de verificação."}

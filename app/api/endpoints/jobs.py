@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Body
+from fastapi import APIRouter, Depends, HTTPException, Body, Request
 from sqlalchemy.orm import Session
 from typing import List, Optional, Dict, Any
 from app.core.database import get_db
@@ -116,7 +116,12 @@ def listar_jobs(
     return result
 
 @router.get("/pending")
-def get_pending_jobs(limit: int = 10, db: Session = Depends(get_db), hub: Any = Depends(verify_worker_api_key)):
+def get_pending_jobs(
+    limit: int = 10,
+    request: Request = None,
+    db: Session = Depends(get_db),
+    hub: Any = Depends(verify_worker_api_key)
+):
     """Busca jobs pendentes para o Worker processar e realiza o lock."""
     # Considera pending ou processing travado há mais de 10 minutos
     ten_minutes_ago = datetime.now(timezone.utc) - timedelta(minutes=10)
@@ -144,8 +149,11 @@ def get_pending_jobs(limit: int = 10, db: Session = Depends(get_db), hub: Any = 
     # usaríamos FOR UPDATE SKIP LOCKED. Para simplificar no SQLAlchemy genérico:
     locked_jobs = []
     
-    # O Worker que está chamando a API pode enviar seu ID, mas usaremos um genérico
-    worker_id = "worker_remote" 
+    worker_id = None
+    if request:
+        worker_id = request.headers.get("X-Worker-Id")
+    if not worker_id:
+        worker_id = "worker_remote"
     
     for job, cliente, certidao, tipo_cert in jobs:
         try:

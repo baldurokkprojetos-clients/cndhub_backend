@@ -19,6 +19,7 @@ class ClienteUpdate(ClienteBase):
     cnpj: Optional[str] = None
     razao_social: Optional[str] = None
     tipos_certidoes: Optional[List[str]] = []
+    hub_id: Optional[str] = None
 
 class ClienteResponse(ClienteBase):
     id: UUID
